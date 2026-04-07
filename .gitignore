@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Logs
+*.log
+logs/
+
+# Java / compiled output
+*.class
+
+# Windows system files
+Thumbs.db
+desktop.ini
+
+# Environment / secrets
+.env
+
