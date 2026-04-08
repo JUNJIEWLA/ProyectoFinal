@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "edu.pucmm.eict.grpc";
+option java_outer_classname = "EncuestaProto";
+
+service EncuestaService {
+  rpc ListarFormularios (UsuarioRequest) returns (FormulariosResponse);
+  rpc CrearFormulario (FormularioRequest) returns (FormularioResponse);
+}
+
+message UsuarioRequest {
+  string usuario_id = 1;
+}
+
+message FormularioRequest {
+  string nombre = 1;
+  string sector = 2;
+  string nivel_escolar = 3;
+  string usuario_registro = 4;
+  double latitud = 5;
+  double longitud = 6;
+  string fotografia = 7;
+}
+
+message FormularioResponse {
+  string id = 1;
+  bool ok = 2;
+}
+
+message FormulariosResponse {
+  repeated FormularioDTO items = 1;
+}
+
+message FormularioDTO {
+  string id = 1;
+  string nombre = 2;
+  string sector = 3;
+  string nivel_escolar = 4;
+  string usuario_registro = 5;
+  double latitud = 6;
+  double longitud = 7;
+}
+
