@@ -1,0 +1,10 @@
+body {
+    max-width: 900px;
+    margin: auto;
+}
+
+#webcam {
+    background: #111;
+    max-height: 260px;
+}
+
