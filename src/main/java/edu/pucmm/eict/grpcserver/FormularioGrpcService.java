@@ -7,6 +7,7 @@ import edu.pucmm.eict.grpc.FormularioResponse;
 import edu.pucmm.eict.grpc.FormulariosResponse;
 import edu.pucmm.eict.grpc.UsuarioRequest;
 import edu.pucmm.eict.models.Formulario;
+import edu.pucmm.eict.models.Usuario;
 import edu.pucmm.eict.services.FormularioService;
 import edu.pucmm.eict.services.UserService;
 import io.grpc.Status;
@@ -23,9 +24,15 @@ public class FormularioGrpcService extends EncuestaServiceGrpc.EncuestaServiceIm
 
     @Override
     public void listarFormularios(UsuarioRequest request, StreamObserver<FormulariosResponse> responseObserver) {
-        String usuarioRegistro = resolveUsuarioRegistro(request.getUsuarioId());
-        if (usuarioRegistro == null) {
+        String usuarioIdOrEmail = request.getUsuarioId();
+        if (usuarioIdOrEmail == null || usuarioIdOrEmail.isBlank()) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("usuario_id requerido").asRuntimeException());
+            return;
+        }
+
+        String usuarioRegistro = resolveUsuarioRegistro(usuarioIdOrEmail);
+        if (usuarioRegistro == null) {
+            responseObserver.onError(Status.NOT_FOUND.withDescription("Usuario no encontrado").asRuntimeException());
             return;
         }
 
@@ -75,7 +82,7 @@ public class FormularioGrpcService extends EncuestaServiceGrpc.EncuestaServiceIm
         if (value.contains("@")) {
             return value.toLowerCase();
         }
-        var user = userService.findById(value);
+        Usuario user = userService.findById(value);
         return user != null ? user.getEmail() : null;
     }
 }

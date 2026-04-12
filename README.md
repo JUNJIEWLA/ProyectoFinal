@@ -41,6 +41,12 @@ cd "C:\Users\Willian\Documents\PUCMM\ProyectoWeb\ProyectoFinalWeb"
 - `ADMIN` y `OPERADOR`: `GET/POST/PUT /api/formularios`, `POST /api/formularios/sync`, `/sync` (WebSocket).
 - `ADMIN` solamente: `DELETE /api/formularios/{id}`.
 
+## API REST (JWT)
+Usa `Authorization: Bearer <token>` (se obtiene en `POST /api/login`).
+- Listar formularios por usuario: `GET /api/formularios?usuario=<email|id>` o `GET /api/formularios/usuario/<email|id>`.
+- Listar mis formularios: `GET /api/formularios/mine`.
+- Crear formulario para el usuario autenticado: `POST /api/formularios/mine` (incluye `fotografia` en base64 si aplica).
+
 ## Docker
 ```powershell
 cd "C:\Users\Willian\Documents\PUCMM\ProyectoWeb\ProyectoFinalWeb"
@@ -50,4 +56,7 @@ docker compose up --build
 
 ## gRPC
 El contrato base esta en `src/main/proto/encuesta.proto` y el servidor gRPC corre junto al backend HTTP.
+Operaciones:
+- `ListarFormularios(UsuarioRequest)` filtra por usuario (`usuario_id` acepta `email` o `id`).
+- `CrearFormulario(FormularioRequest)` soporta `fotografia` en base64.
 
