@@ -51,6 +51,7 @@ public final class AppFactory {
                 return;
             }
             DecodedJWT jwt = authMiddleware.handle(ctx);
+            ctx.attribute("jwt", jwt);
             String role = jwt.getClaim("rol").asString();
 
             if (ctx.path().startsWith("/api/formularios") && ctx.method().name().equals("DELETE")) {
@@ -61,10 +62,54 @@ public final class AppFactory {
             }
         });
 
-        app.get("/api/formularios", ctx -> ctx.json(formularioService.listAll()));
+        app.get("/api/formularios", ctx -> {
+            String usuario = ctx.queryParam("usuario");
+            if (usuario == null || usuario.isBlank()) {
+                ctx.json(formularioService.listAll());
+                return;
+            }
+
+            String usuarioRegistro = resolveUsuarioRegistro(userService, usuario);
+            if (usuarioRegistro == null) {
+                ctx.status(404).json(Map.of("error", "Usuario no encontrado"));
+                return;
+            }
+
+            ctx.json(formularioService.listByUsuarioRegistro(usuarioRegistro));
+        });
+
+        app.get("/api/formularios/usuario/{usuario}", ctx -> {
+            String usuario = ctx.pathParam("usuario");
+            String usuarioRegistro = resolveUsuarioRegistro(userService, usuario);
+            if (usuarioRegistro == null) {
+                ctx.status(404).json(Map.of("error", "Usuario no encontrado"));
+                return;
+            }
+            ctx.json(formularioService.listByUsuarioRegistro(usuarioRegistro));
+        });
+
+        app.get("/api/formularios/mine", ctx -> {
+            DecodedJWT jwt = ctx.attribute("jwt");
+            String email = jwt.getClaim("email").asString();
+            ctx.json(formularioService.listByUsuarioRegistro(email));
+        });
 
         app.post("/api/formularios", ctx -> {
             Formulario formulario = ctx.bodyAsClass(Formulario.class);
+            if (formulario.getUsuarioRegistro() == null || formulario.getUsuarioRegistro().isBlank()) {
+                DecodedJWT jwt = ctx.attribute("jwt");
+                formulario.setUsuarioRegistro(jwt.getClaim("email").asString());
+            }
+            formulario.setSincronizado(true);
+            ctx.status(201).json(formularioService.create(formulario));
+        });
+
+        app.post("/api/formularios/mine", ctx -> {
+            DecodedJWT jwt = ctx.attribute("jwt");
+            String email = jwt.getClaim("email").asString();
+
+            Formulario formulario = ctx.bodyAsClass(Formulario.class);
+            formulario.setUsuarioRegistro(email);
             formulario.setSincronizado(true);
             ctx.status(201).json(formularioService.create(formulario));
         });
@@ -119,6 +164,18 @@ public final class AppFactory {
         });
 
         return app;
+    }
+
+    private static String resolveUsuarioRegistro(UserService userService, String usuarioIdOrEmail) {
+        if (usuarioIdOrEmail == null || usuarioIdOrEmail.isBlank()) {
+            return null;
+        }
+        String value = usuarioIdOrEmail.trim();
+        if (value.contains("@")) {
+            return value.toLowerCase();
+        }
+        Usuario user = userService.findById(value);
+        return user != null ? user.getEmail() : null;
     }
 
     private static void requireAnyRole(String role, Set<String> allowedRoles) {

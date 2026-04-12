@@ -22,5 +22,17 @@ public class UserService {
         }
         return usersByEmail.get(email);
     }
+
+    public Usuario findById(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        for (Usuario user : usersByEmail.values()) {
+            if (id.equals(user.getId())) {
+                return user;
+            }
+        }
+        return null;
+    }
 }
 
