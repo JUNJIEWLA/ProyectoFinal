@@ -1,10 +1,13 @@
 package edu.pucmm.eict.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public class Usuario {
     private String id;
     private String nombre;
     private String email;
     private String rol;
+    private String passwordHash;
 
     public Usuario() {
     }
@@ -47,5 +50,13 @@ public class Usuario {
     public void setRol(String rol) {
         this.rol = rol;
     }
-}
 
+    @JsonIgnore
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+}
