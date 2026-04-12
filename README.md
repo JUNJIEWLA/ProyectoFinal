@@ -54,6 +54,17 @@ Usa `Authorization: Bearer <token>` (se obtiene en `POST /api/login`).
 - Listar mis formularios: `GET /api/formularios/mine`.
 - Crear formulario para el usuario autenticado: `POST /api/formularios/mine` (incluye `fotografia` en base64 si aplica).
 
+## Clientes (no consola)
+### Cliente REST (Swing)
+```powershell
+.\gradlew.bat runRestClient
+```
+
+### Cliente gRPC (Swing)
+```powershell
+.\gradlew.bat runGrpcClient
+```
+
 ## Docker
 ```powershell
 cd "C:\Users\Willian\Documents\PUCMM\ProyectoWeb\ProyectoFinalWeb"

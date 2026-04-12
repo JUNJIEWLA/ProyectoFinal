@@ -4,10 +4,12 @@ services:
     build: .
     ports:
       - "7000:7000"
+      - "50051:50051"
     environment:
       - JWT_SECRET=dev-secret-change-me
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB=encuestas
+      - GRPC_PORT=50051
     depends_on:
       - mongo
 

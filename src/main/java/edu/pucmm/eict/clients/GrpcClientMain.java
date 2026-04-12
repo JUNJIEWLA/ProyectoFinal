@@ -1,8 +1,14 @@
 package edu.pucmm.eict.clients;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.pucmm.eict.models.Formulario;
+import edu.pucmm.eict.grpc.EncuestaServiceGrpc;
+import edu.pucmm.eict.grpc.FormularioDTO;
+import edu.pucmm.eict.grpc.FormularioRequest;
+import edu.pucmm.eict.grpc.FormularioResponse;
+import edu.pucmm.eict.grpc.FormulariosResponse;
+import edu.pucmm.eict.grpc.UsuarioRequest;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -12,7 +18,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
@@ -29,71 +34,53 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.File;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.time.Duration;
 import java.util.Base64;
-import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-public final class RestClientMain {
+public final class GrpcClientMain {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception ignored) {
             }
-            new RestClientFrame().setVisible(true);
+            new GrpcClientFrame().setVisible(true);
         });
     }
 
-    private static final class RestClientFrame extends JFrame {
-        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-        private final HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .build();
+    private static final class GrpcClientFrame extends JFrame {
+        private final JTextField hostField = new JTextField("localhost", 18);
+        private final JTextField portField = new JTextField("50051", 8);
+        private final JLabel statusLabel = new JLabel("Desconectado");
 
-        private final JTextField baseUrlField = new JTextField("http://localhost:7000", 28);
-
-        private final JTextField emailField = new JTextField("admin@encuestas.local", 22);
-        private final JPasswordField passwordField = new JPasswordField("admin123", 22);
-        private final JLabel sessionLabel = new JLabel("No autenticado");
-        private final JTextArea tokenArea = new JTextArea(3, 60);
-
-        private final JTextField listarUsuarioField = new JTextField("", 22);
+        private final JTextField listarUsuarioField = new JTextField("admin@encuestas.local", 22);
         private final DefaultTableModel listTableModel = new DefaultTableModel(
-                new String[]{"id", "nombre", "sector", "nivelEscolar", "usuarioRegistro", "latitud", "longitud", "fechaRegistro"},
+                new String[]{"id", "nombre", "sector", "nivelEscolar", "usuarioRegistro", "latitud", "longitud"},
                 0
         );
 
         private final JTextField nombreField = new JTextField("", 18);
         private final JTextField sectorField = new JTextField("", 18);
         private final JComboBox<String> nivelField = new JComboBox<>(new String[]{"BASICO", "MEDIO", "GRADO", "POSTGRADO", "DOCTORADO"});
+        private final JTextField usuarioRegistroField = new JTextField("admin@encuestas.local", 22);
         private final JTextField latField = new JTextField("19.4", 10);
         private final JTextField lonField = new JTextField("-70.6", 10);
         private final JTextField fotoPathField = new JTextField("", 26);
         private String fotoBase64;
 
-        private final JTextArea outputArea = new JTextArea(8, 60);
+        private final JTextArea outputArea = new JTextArea(10, 60);
 
-        private String token;
-        private String usuarioEmail;
-        private String usuarioRol;
+        private ManagedChannel channel;
+        private EncuestaServiceGrpc.EncuestaServiceBlockingStub stub;
+        private String connectedHost;
+        private int connectedPort;
 
-        private RestClientFrame() {
-            super("Cliente REST (JWT) - Encuestas");
+        private GrpcClientFrame() {
+            super("Cliente gRPC (no consola) - Encuestas");
             setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             setMinimumSize(new Dimension(980, 720));
             setLayout(new BorderLayout());
-
-            tokenArea.setLineWrap(true);
-            tokenArea.setWrapStyleWord(true);
-            tokenArea.setEditable(false);
-            tokenArea.setBorder(BorderFactory.createEtchedBorder());
 
             fotoPathField.setEditable(false);
             outputArea.setEditable(false);
@@ -102,6 +89,13 @@ public final class RestClientMain {
 
             add(buildTopPanel(), BorderLayout.NORTH);
             add(buildTabs(), BorderLayout.CENTER);
+
+            addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosed(java.awt.event.WindowEvent e) {
+                    shutdownChannel();
+                }
+            });
         }
 
         private JPanel buildTopPanel() {
@@ -112,54 +106,37 @@ public final class RestClientMain {
             c.insets = new Insets(4, 4, 4, 4);
             c.anchor = GridBagConstraints.WEST;
 
-            int row = 0;
             c.gridx = 0;
-            c.gridy = row;
-            panel.add(new JLabel("Base URL:"), c);
+            c.gridy = 0;
+            panel.add(new JLabel("Host:"), c);
             c.gridx = 1;
-            panel.add(baseUrlField, c);
+            panel.add(hostField, c);
 
-            JButton healthButton = new JButton("Health");
-            healthButton.addActionListener(e -> runHealth());
             c.gridx = 2;
-            panel.add(healthButton, c);
-
-            row++;
-            c.gridx = 0;
-            c.gridy = row;
-            panel.add(new JLabel("Email:"), c);
-            c.gridx = 1;
-            panel.add(emailField, c);
-
-            row++;
-            c.gridx = 0;
-            c.gridy = row;
-            panel.add(new JLabel("Password:"), c);
-            c.gridx = 1;
-            panel.add(passwordField, c);
-
-            JButton loginButton = new JButton("Login");
-            loginButton.addActionListener(e -> runLogin());
-            c.gridx = 2;
-            panel.add(loginButton, c);
-
-            JButton logoutButton = new JButton("Logout");
-            logoutButton.addActionListener(e -> logout());
+            panel.add(new JLabel("Port:"), c);
             c.gridx = 3;
-            panel.add(logoutButton, c);
+            panel.add(portField, c);
 
-            row++;
+            JButton connectButton = new JButton("Conectar");
+            connectButton.addActionListener(e -> runConnect());
+            c.gridx = 4;
+            panel.add(connectButton, c);
+
+            JButton disconnectButton = new JButton("Desconectar");
+            disconnectButton.addActionListener(e -> {
+                shutdownChannel();
+                statusLabel.setText("Desconectado");
+                appendOutput("Canal cerrado");
+            });
+            c.gridx = 5;
+            panel.add(disconnectButton, c);
+
             c.gridx = 0;
-            c.gridy = row;
-            panel.add(new JLabel("Sesion:"), c);
+            c.gridy = 1;
+            panel.add(new JLabel("Estado:"), c);
             c.gridx = 1;
-            panel.add(sessionLabel, c);
-
-            row++;
-            c.gridx = 0;
-            c.gridy = row;
             c.gridwidth = 4;
-            panel.add(new JScrollPane(tokenArea), c);
+            panel.add(statusLabel, c);
 
             return panel;
         }
@@ -183,12 +160,11 @@ public final class RestClientMain {
 
             c.gridx = 0;
             c.gridy = 0;
-            top.add(new JLabel("Usuario (email o id, opcional):"), c);
-
+            top.add(new JLabel("usuario_id (email o id):"), c);
             c.gridx = 1;
             top.add(listarUsuarioField, c);
 
-            JButton listarButton = new JButton("Listar");
+            JButton listarButton = new JButton("Listar (gRPC)");
             listarButton.addActionListener(e -> runList());
             c.gridx = 2;
             top.add(listarButton, c);
@@ -197,7 +173,6 @@ public final class RestClientMain {
 
             JTable table = new JTable(listTableModel);
             panel.add(new JScrollPane(table), BorderLayout.CENTER);
-
             return panel;
         }
 
@@ -234,6 +209,13 @@ public final class RestClientMain {
             row++;
             c.gridx = 0;
             c.gridy = row;
+            form.add(new JLabel("Usuario registro (email):"), c);
+            c.gridx = 1;
+            form.add(usuarioRegistroField, c);
+
+            row++;
+            c.gridx = 0;
+            c.gridy = row;
             form.add(new JLabel("Latitud:"), c);
             c.gridx = 1;
             form.add(latField, c);
@@ -262,7 +244,7 @@ public final class RestClientMain {
             c.gridx = 3;
             form.add(clearButton, c);
 
-            JButton crearButton = new JButton("Crear (REST)");
+            JButton crearButton = new JButton("Crear (gRPC)");
             crearButton.addActionListener(e -> runCreate());
             c.gridx = 1;
             c.gridy = row + 1;
@@ -272,7 +254,7 @@ public final class RestClientMain {
             panel.add(form, BorderLayout.NORTH);
 
             JTextArea note = new JTextArea(
-                    "Crea el formulario usando `POST /api/formularios/mine` con JWT.\n" +
+                    "Crea el formulario usando `EncuestaService/CrearFormulario`.\n" +
                             "La imagen se envia como string base64 (Data URL)."
             );
             note.setEditable(false);
@@ -289,96 +271,30 @@ public final class RestClientMain {
             return panel;
         }
 
-        private void runHealth() {
+        private void runConnect() {
             runAsync(() -> {
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + "/api/health"))
-                        .timeout(Duration.ofSeconds(10))
-                        .GET()
-                        .build();
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                return response.statusCode() + " " + response.body();
-            }, this::appendOutput);
-        }
-
-        private void runLogin() {
-            String email = emailField.getText().trim();
-            String password = new String(passwordField.getPassword());
-
-            runAsync(() -> {
-                String payload = OBJECT_MAPPER.writeValueAsString(Map.of("email", email, "password", password));
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + "/api/login"))
-                        .timeout(Duration.ofSeconds(15))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(payload))
-                        .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() != 200) {
-                    throw new IllegalStateException("HTTP " + response.statusCode() + ": " + response.body());
-                }
-
-                JsonNode json = OBJECT_MAPPER.readTree(response.body());
-                String token = json.path("token").asText(null);
-                if (token == null || token.isBlank()) {
-                    throw new IllegalStateException("Respuesta sin token");
-                }
-
-                String userEmail = json.path("usuario").path("email").asText("");
-                String userRol = json.path("usuario").path("rol").asText("");
-
-                return new Session(token, userEmail, userRol);
-            }, session -> {
-                this.token = session.token();
-                this.usuarioEmail = session.email();
-                this.usuarioRol = session.rol();
-                tokenArea.setText(session.token());
-                sessionLabel.setText("Autenticado: " + session.email() + " (" + session.rol() + ")");
-                if (listarUsuarioField.getText().isBlank()) {
-                    listarUsuarioField.setText(session.email());
-                }
-                appendOutput("Login OK: " + session.email() + " (" + session.rol() + ")");
+                ensureChannel();
+                return "Conectado a " + connectedHost + ":" + connectedPort;
+            }, msg -> {
+                statusLabel.setText(msg);
+                appendOutput(msg);
             });
         }
 
-        private void logout() {
-            token = null;
-            usuarioEmail = null;
-            usuarioRol = null;
-            tokenArea.setText("");
-            sessionLabel.setText("No autenticado");
-            appendOutput("Logout");
-        }
-
         private void runList() {
-            if (!ensureToken()) {
+            String usuarioId = listarUsuarioField.getText().trim();
+            if (usuarioId.isBlank()) {
+                JOptionPane.showMessageDialog(this, "usuario_id requerido", "Validacion", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
-            String usuario = listarUsuarioField.getText().trim();
-
             runAsync(() -> {
-                String path = (usuario.isBlank())
-                        ? "/api/formularios/mine"
-                        : "/api/formularios?usuario=" + URLEncoder.encode(usuario, StandardCharsets.UTF_8);
-
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + path))
-                        .timeout(Duration.ofSeconds(20))
-                        .header("Authorization", "Bearer " + token)
-                        .GET()
-                        .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() != 200) {
-                    throw new IllegalStateException("HTTP " + response.statusCode() + ": " + response.body());
-                }
-
-                return OBJECT_MAPPER.readValue(response.body(), Formulario[].class);
-            }, formularios -> {
+                ensureChannel();
+                FormulariosResponse response = stub.listarFormularios(UsuarioRequest.newBuilder().setUsuarioId(usuarioId).build());
+                return response;
+            }, response -> {
                 listTableModel.setRowCount(0);
-                for (Formulario f : formularios) {
+                for (FormularioDTO f : response.getItemsList()) {
                     listTableModel.addRow(new Object[]{
                             f.getId(),
                             f.getNombre(),
@@ -386,25 +302,21 @@ public final class RestClientMain {
                             f.getNivelEscolar(),
                             f.getUsuarioRegistro(),
                             f.getLatitud(),
-                            f.getLongitud(),
-                            f.getFechaRegistro()
+                            f.getLongitud()
                     });
                 }
-                appendOutput("Listados: " + formularios.length);
+                appendOutput("Listados (gRPC): " + response.getItemsCount());
             });
         }
 
         private void runCreate() {
-            if (!ensureToken()) {
-                return;
-            }
-
             String nombre = nombreField.getText().trim();
             String sector = sectorField.getText().trim();
             String nivel = (String) nivelField.getSelectedItem();
+            String usuarioRegistro = usuarioRegistroField.getText().trim();
 
-            if (nombre.isBlank() || sector.isBlank()) {
-                JOptionPane.showMessageDialog(this, "Nombre y sector son requeridos", "Validacion", JOptionPane.WARNING_MESSAGE);
+            if (nombre.isBlank() || sector.isBlank() || usuarioRegistro.isBlank()) {
+                JOptionPane.showMessageDialog(this, "Nombre, sector y usuarioRegistro son requeridos", "Validacion", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
@@ -418,31 +330,19 @@ public final class RestClientMain {
                 return;
             }
 
-            Formulario form = new Formulario();
-            form.setNombre(nombre);
-            form.setSector(sector);
-            form.setNivelEscolar(nivel);
-            form.setLatitud(lat);
-            form.setLongitud(lon);
-            form.setFotografia(fotoBase64);
-
             runAsync(() -> {
-                String payload = OBJECT_MAPPER.writeValueAsString(form);
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + "/api/formularios/mine"))
-                        .timeout(Duration.ofSeconds(20))
-                        .header("Authorization", "Bearer " + token)
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(payload))
-                        .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() != 201) {
-                    throw new IllegalStateException("HTTP " + response.statusCode() + ": " + response.body());
-                }
-
-                return response.body();
-            }, body -> appendOutput("Creado OK: " + body));
+                ensureChannel();
+                FormularioResponse response = stub.crearFormulario(FormularioRequest.newBuilder()
+                        .setNombre(nombre)
+                        .setSector(sector)
+                        .setNivelEscolar(nivel == null ? "" : nivel)
+                        .setUsuarioRegistro(usuarioRegistro)
+                        .setLatitud(lat)
+                        .setLongitud(lon)
+                        .setFotografia(fotoBase64 == null ? "" : fotoBase64)
+                        .build());
+                return response;
+            }, response -> appendOutput("Creado (gRPC) ok=" + response.getOk() + " id=" + response.getId()));
         }
 
         private void choosePhoto() {
@@ -472,20 +372,42 @@ public final class RestClientMain {
             appendOutput("Foto removida");
         }
 
-        private boolean ensureToken() {
-            if (token == null || token.isBlank()) {
-                JOptionPane.showMessageDialog(this, "Debes hacer login primero", "Validacion", JOptionPane.WARNING_MESSAGE);
-                return false;
+        private void ensureChannel() {
+            String host = hostField.getText().trim();
+            int port = parsePort(portField.getText().trim());
+
+            if (stub != null && host.equals(connectedHost) && port == connectedPort) {
+                return;
             }
-            return true;
+
+            shutdownChannel();
+            channel = ManagedChannelBuilder.forAddress(host, port)
+                    .usePlaintext()
+                    .idleTimeout(2, TimeUnit.MINUTES)
+                    .build();
+            stub = EncuestaServiceGrpc.newBlockingStub(channel);
+            connectedHost = host;
+            connectedPort = port;
         }
 
-        private String baseUrl() {
-            String value = baseUrlField.getText().trim();
-            if (value.endsWith("/")) {
-                return value.substring(0, value.length() - 1);
+        private void shutdownChannel() {
+            if (channel != null) {
+                channel.shutdownNow();
+                channel = null;
+                stub = null;
             }
-            return value;
+        }
+
+        private int parsePort(String value) {
+            try {
+                int port = Integer.parseInt(value);
+                if (port <= 0 || port > 65535) {
+                    throw new NumberFormatException("rango");
+                }
+                return port;
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException("Puerto invalido");
+            }
         }
 
         private void appendOutput(String message) {
@@ -504,15 +426,16 @@ public final class RestClientMain {
                     try {
                         onSuccess.accept(get());
                     } catch (Exception ex) {
-                        String msg = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
+                        Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                        String msg = cause.getMessage() != null ? cause.getMessage() : cause.toString();
+                        if (cause instanceof StatusRuntimeException statusEx) {
+                            msg = statusEx.getStatus().toString();
+                        }
                         appendOutput("ERROR: " + msg);
-                        JOptionPane.showMessageDialog(RestClientFrame.this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(GrpcClientFrame.this, msg, "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 }
             }.execute();
-        }
-
-        private record Session(String token, String email, String rol) {
         }
 
         private interface Work<T> {

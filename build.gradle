@@ -55,6 +55,20 @@ application {
     mainClass = 'edu.pucmm.eict.Main'
 }
 
+tasks.register('runRestClient', JavaExec) {
+    group = 'application'
+    description = 'Ejecuta el cliente REST (Swing)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.pucmm.eict.clients.RestClientMain'
+}
+
+tasks.register('runGrpcClient', JavaExec) {
+    group = 'application'
+    description = 'Ejecuta el cliente gRPC (Swing)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.pucmm.eict.clients.GrpcClientMain'
+}
+
 test {
     useJUnitPlatform()
 }
