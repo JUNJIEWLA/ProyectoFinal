@@ -40,6 +40,13 @@ cd "C:\Users\Willian\Documents\PUCMM\ProyectoWeb\ProyectoFinalWeb"
 ## Roles por endpoint
 - `ADMIN` y `OPERADOR`: `GET/POST/PUT /api/formularios`, `POST /api/formularios/sync`, `/sync` (WebSocket).
 - `ADMIN` solamente: `DELETE /api/formularios/{id}`.
+- `ADMIN` solamente: `GET/POST/PUT/DELETE /api/users`.
+- Cualquier usuario autenticado: `GET /api/users/me`.
+
+## Usuarios
+Al iniciar, el servidor crea usuarios demo si no existen (en MongoDB o en memoria):
+- `admin@encuestas.local` / `admin123` (ADMIN)
+- `digitador@encuestas.local` / `digitador123` (OPERADOR)
 
 ## Docker
 ```powershell

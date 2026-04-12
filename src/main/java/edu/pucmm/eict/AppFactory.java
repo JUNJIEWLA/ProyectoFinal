@@ -5,8 +5,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pucmm.eict.auth.AuthMiddleware;
 import edu.pucmm.eict.auth.JwtService;
+import edu.pucmm.eict.dto.CreateUserRequest;
 import edu.pucmm.eict.dto.LoginRequest;
 import edu.pucmm.eict.dto.LoginResponse;
+import edu.pucmm.eict.dto.UpdateUserRequest;
 import edu.pucmm.eict.models.Formulario;
 import edu.pucmm.eict.models.Usuario;
 import edu.pucmm.eict.services.FormularioService;
@@ -51,7 +53,12 @@ public final class AppFactory {
                 return;
             }
             DecodedJWT jwt = authMiddleware.handle(ctx);
+            ctx.attribute("jwt", jwt);
             String role = jwt.getClaim("rol").asString();
+
+            if (ctx.path().startsWith("/api/users") && !ctx.path().equals("/api/users/me")) {
+                requireAnyRole(role, Set.of("ADMIN"));
+            }
 
             if (ctx.path().startsWith("/api/formularios") && ctx.method().name().equals("DELETE")) {
                 requireAnyRole(role, Set.of("ADMIN"));
@@ -59,6 +66,66 @@ public final class AppFactory {
             if (ctx.path().startsWith("/api/formularios") && !ctx.method().name().equals("DELETE")) {
                 requireAnyRole(role, Set.of("ADMIN", "OPERADOR"));
             }
+        });
+
+        app.get("/api/users", ctx -> ctx.json(userService.listUsers()));
+
+        app.get("/api/users/me", ctx -> {
+            DecodedJWT jwt = ctx.attribute("jwt");
+            if (jwt == null) {
+                ctx.status(401).json(Map.of("error", "No autenticado"));
+                return;
+            }
+            Usuario user = userService.findById(jwt.getSubject());
+            if (user == null) {
+                ctx.status(404).json(Map.of("error", "Usuario no encontrado"));
+                return;
+            }
+            ctx.json(user);
+        });
+
+        app.post("/api/users", ctx -> {
+            CreateUserRequest request = ctx.bodyAsClass(CreateUserRequest.class);
+            if (request.getEmail() == null || request.getEmail().isBlank()
+                    || request.getPassword() == null || request.getPassword().isBlank()) {
+                ctx.status(400).json(Map.of("error", "Email y password son requeridos"));
+                return;
+            }
+
+            try {
+                Usuario created = userService.createUser(request.getNombre(), request.getEmail(), request.getPassword(), request.getRol());
+                if (created == null) {
+                    ctx.status(409).json(Map.of("error", "Email ya existe"));
+                    return;
+                }
+                ctx.status(201).json(created);
+            } catch (IllegalArgumentException ex) {
+                ctx.status(400).json(Map.of("error", ex.getMessage()));
+            }
+        });
+
+        app.put("/api/users/{id}", ctx -> {
+            String id = ctx.pathParam("id");
+            UpdateUserRequest request = ctx.bodyAsClass(UpdateUserRequest.class);
+            try {
+                Usuario updated = userService.updateUser(id, request.getNombre(), request.getPassword(), request.getRol());
+                if (updated == null) {
+                    ctx.status(404).json(Map.of("error", "Usuario no encontrado"));
+                    return;
+                }
+                ctx.json(updated);
+            } catch (IllegalArgumentException ex) {
+                ctx.status(400).json(Map.of("error", ex.getMessage()));
+            }
+        });
+
+        app.delete("/api/users/{id}", ctx -> {
+            boolean deleted = userService.deleteUser(ctx.pathParam("id"));
+            if (!deleted) {
+                ctx.status(404).json(Map.of("error", "Usuario no encontrado"));
+                return;
+            }
+            ctx.status(204);
         });
 
         app.get("/api/formularios", ctx -> ctx.json(formularioService.listAll()));
