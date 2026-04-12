@@ -47,6 +47,28 @@ public class FormularioService {
         return new ArrayList<>(inMemoryStore.values());
     }
 
+    public List<Formulario> listByUsuarioRegistro(String usuarioRegistro) {
+        if (usuarioRegistro == null || usuarioRegistro.isBlank()) {
+            return List.of();
+        }
+
+        if (isMongoEnabled()) {
+            List<Formulario> output = new ArrayList<>();
+            for (Document doc : collection.find(eq("usuarioRegistro", usuarioRegistro))) {
+                output.add(fromDocument(doc));
+            }
+            return output;
+        }
+
+        List<Formulario> output = new ArrayList<>();
+        for (Formulario form : inMemoryStore.values()) {
+            if (usuarioRegistro.equals(form.getUsuarioRegistro())) {
+                output.add(form);
+            }
+        }
+        return output;
+    }
+
     public Formulario create(Formulario formulario) {
         normalize(formulario);
         if (isMongoEnabled()) {
