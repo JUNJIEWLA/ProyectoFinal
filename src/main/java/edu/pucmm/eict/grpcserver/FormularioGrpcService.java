@@ -8,19 +8,29 @@ import edu.pucmm.eict.grpc.FormulariosResponse;
 import edu.pucmm.eict.grpc.UsuarioRequest;
 import edu.pucmm.eict.models.Formulario;
 import edu.pucmm.eict.services.FormularioService;
+import edu.pucmm.eict.services.UserService;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
 public class FormularioGrpcService extends EncuestaServiceGrpc.EncuestaServiceImplBase {
     private final FormularioService formularioService;
+    private final UserService userService;
 
-    public FormularioGrpcService(FormularioService formularioService) {
+    public FormularioGrpcService(FormularioService formularioService, UserService userService) {
         this.formularioService = formularioService;
+        this.userService = userService;
     }
 
     @Override
     public void listarFormularios(UsuarioRequest request, StreamObserver<FormulariosResponse> responseObserver) {
+        String usuarioRegistro = resolveUsuarioRegistro(request.getUsuarioId());
+        if (usuarioRegistro == null) {
+            responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("usuario_id requerido").asRuntimeException());
+            return;
+        }
+
         FormulariosResponse.Builder response = FormulariosResponse.newBuilder();
-        for (Formulario item : formularioService.listAll()) {
+        for (Formulario item : formularioService.listByUsuarioRegistro(usuarioRegistro)) {
             response.addItems(FormularioDTO.newBuilder()
                     .setId(item.getId() == null ? "" : item.getId())
                     .setNombre(item.getNombre() == null ? "" : item.getNombre())
@@ -55,6 +65,18 @@ public class FormularioGrpcService extends EncuestaServiceGrpc.EncuestaServiceIm
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();
+    }
+
+    private String resolveUsuarioRegistro(String usuarioIdOrEmail) {
+        if (usuarioIdOrEmail == null || usuarioIdOrEmail.isBlank()) {
+            return null;
+        }
+        String value = usuarioIdOrEmail.trim();
+        if (value.contains("@")) {
+            return value.toLowerCase();
+        }
+        var user = userService.findById(value);
+        return user != null ? user.getEmail() : null;
     }
 }
 

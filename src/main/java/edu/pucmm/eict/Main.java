@@ -17,7 +17,7 @@ public class Main {
 
         Javalin app = AppFactory.create(formularioService, userService, jwtService).start(httpPort);
 
-        GrpcServer grpcServer = new GrpcServer(grpcPort, formularioService);
+        GrpcServer grpcServer = new GrpcServer(grpcPort, formularioService, userService);
         try {
             grpcServer.start();
         } catch (Exception ex) {
