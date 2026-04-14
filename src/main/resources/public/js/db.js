@@ -33,6 +33,10 @@ const OfflineDB = (() => {
         return withStore('readonly', (store) => store.getAll());
     }
 
+    function getById(id) {
+        return withStore('readonly', (store) => store.get(id));
+    }
+
     async function getPending() {
         const all = await getAll();
         return all.filter((f) => !f.sincronizado);
@@ -57,6 +61,6 @@ const OfflineDB = (() => {
         });
     }
 
-    return { init, saveFormulario, deleteFormulario, getAll, getPending, markSynced };
+    return { init, saveFormulario, deleteFormulario, getAll, getById, getPending, markSynced };
 })();
 

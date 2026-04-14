@@ -1,9 +1,15 @@
-const CACHE_NAME = 'encuestas-cache-v2';
+const CACHE_NAME = 'encuestas-cache-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
+    '/login.html',
+    '/encuestas.html',
+    '/usuarios.html',
     '/css/styles.css',
-    '/js/app.js',
+    '/js/auth.js',
+    '/js/login.js',
+    '/js/encuestas.js',
+    '/js/users.js',
     '/js/db.js',
     '/js/sync.js',
     '/js/worker.js',
@@ -37,7 +43,10 @@ self.addEventListener('fetch', (event) => {
 
     if (request.mode === 'navigate' || accept.includes('text/html')) {
         event.respondWith(
-            fetch(request).catch(() => caches.match('/index.html'))
+            fetch(request).catch(async () => {
+                const cachedPage = await caches.match(request);
+                return cachedPage || caches.match('/login.html');
+            })
         );
         return;
     }
@@ -47,7 +56,7 @@ self.addEventListener('fetch', (event) => {
             if (cached) {
                 return cached;
             }
-            return fetch(request).catch(() => caches.match('/index.html'));
+            return fetch(request);
         })
     );
 });
