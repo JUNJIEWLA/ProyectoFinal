@@ -15,19 +15,57 @@ self.onmessage = (event) => {
 function tryWebSocket(wsUrl, token, formularios, restUrl) {
     try {
         const ws = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
+        let settled = false;
+        let serverAck = false;
+
+        const finishWithRest = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            tryRest(restUrl, token, formularios);
+        };
+
+        // Evita que el flujo quede colgado si Render cierra el socket sin responder.
+        const socketTimeout = setTimeout(() => {
+            try {
+                ws.close();
+            } catch {
+                // Ignora errores al cerrar.
+            }
+            finishWithRest();
+        }, 8000);
 
         ws.onopen = () => {
             ws.send(JSON.stringify(formularios));
         };
 
         ws.onmessage = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            serverAck = true;
+            clearTimeout(socketTimeout);
             self.postMessage({ status: 'ok', ids: formularios.map((f) => f.id) });
             ws.close();
         };
 
         ws.onerror = () => {
-            ws.close();
-            tryRest(restUrl, token, formularios);
+            clearTimeout(socketTimeout);
+            try {
+                ws.close();
+            } catch {
+                // Ignora errores al cerrar.
+            }
+            finishWithRest();
+        };
+
+        ws.onclose = () => {
+            clearTimeout(socketTimeout);
+            if (!serverAck) {
+                finishWithRest();
+            }
         };
     } catch (error) {
         tryRest(restUrl, token, formularios);
