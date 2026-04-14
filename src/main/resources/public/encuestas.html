@@ -71,7 +71,7 @@
         <div class="panel-header">
             <span class="panel-title">Pendientes locales</span>
         </div>
-        <div class="panel-body" style="padding: .5rem 0;">
+        <div class="panel-body panel-body-compact">
             <ul id="listaPendientes"></ul>
         </div>
     </div>
@@ -92,18 +92,27 @@
         <div class="modal-body">
             <form id="formEncuesta">
                 <div class="form-row">
-                    <input id="nombre" required class="ctrl" placeholder="Nombre del encuestado">
-                    <input id="sector" required class="ctrl" placeholder="Sector / Zona">
+                    <div>
+                        <input id="nombre" required class="ctrl" placeholder="Nombre del encuestado">
+                        <small id="errorNombre" class="field-error"></small>
+                    </div>
+                    <div>
+                        <input id="sector" required class="ctrl" placeholder="Sector / Zona">
+                        <small id="errorSector" class="field-error"></small>
+                    </div>
                 </div>
-                <div class="form-row" style="align-items:center;">
-                    <select id="nivelEscolar" class="ctrl" required>
-                        <option value="">Nivel escolar…</option>
-                        <option>BASICO</option>
-                        <option>MEDIO</option>
-                        <option>GRADO</option>
-                        <option>POSTGRADO</option>
-                        <option>DOCTORADO</option>
-                    </select>
+                <div class="form-row form-row-middle">
+                    <div>
+                        <select id="nivelEscolar" class="ctrl" required>
+                            <option value="">Nivel escolar…</option>
+                            <option>BASICO</option>
+                            <option>MEDIO</option>
+                            <option>GRADO</option>
+                            <option>POSTGRADO</option>
+                            <option>DOCTORADO</option>
+                        </select>
+                        <small id="errorNivel" class="field-error"></small>
+                    </div>
                     <div>
                         <span id="geoStatus" class="badge-geo">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -115,12 +124,26 @@
                     <video id="webcam" autoplay playsinline></video>
                     <canvas id="canvas"></canvas>
                     <button type="button" id="btnFoto" class="btn-foto">📷 Tomar foto</button>
+                    <small id="errorFoto" class="field-error"></small>
                 </div>
                 <button class="btn-save" type="submit">Guardar local</button>
             </form>
         </div>
     </div>
 </div>
+
+<div id="confirmModalEncuesta" class="confirm-modal-backdrop" aria-hidden="true">
+    <div class="confirm-modal-box">
+        <h6 class="confirm-modal-title">Confirmar eliminacion</h6>
+        <p id="confirmModalEncuestaText" class="confirm-modal-text"></p>
+        <div class="confirm-modal-actions">
+            <button id="confirmModalEncuestaCancel" type="button" class="btn-nav">Cancelar</button>
+            <button id="confirmModalEncuestaOk" type="button" class="btn-nav danger">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastEncuestas" class="app-toast" role="status" aria-live="polite"></div>
 
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>

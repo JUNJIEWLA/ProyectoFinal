@@ -15,7 +15,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* Shared app layout (encuestas + usuarios) */
+/* layout (encuestas + usuarios) */
 body.page-app {
     font-family: 'DM Sans', sans-serif;
     background: #0f172a;
@@ -332,6 +332,7 @@ body.page-app {
 
 .btn-create:hover { opacity: .9; transform: translateY(-1px); }
 .btn-create-row { grid-column: 1 / -1; }
+.btn-create-full { width: 100%; }
 
 #listaUsuarios { list-style: none; padding: 0; margin: 0; }
 
@@ -591,5 +592,83 @@ body.page-login {
     letter-spacing: .08em;
     text-transform: uppercase;
     font-family: 'Sora', sans-serif;
+}
+
+/* Helpers (validaciones, confirmacion, toast) */
+.panel-body-compact { padding: .5rem 0; }
+.form-row-middle { align-items: center; }
+
+.field-error {
+    display: block;
+    min-height: 1rem;
+    margin-top: .3rem;
+    color: #fca5a5;
+    font-size: .75rem;
+}
+
+.ctrl.is-invalid {
+    border-color: rgba(239,68,68,.8);
+    box-shadow: 0 0 0 2px rgba(239,68,68,.2);
+}
+
+.confirm-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    background: rgba(0,0,0,.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.confirm-modal-backdrop.open { display: flex; }
+
+.confirm-modal-box {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.confirm-modal-title {
+    margin: 0 0 .5rem;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+}
+
+.confirm-modal-text {
+    margin: 0 0 1rem;
+    color: var(--muted);
+}
+
+.confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+}
+
+.app-toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 900;
+    background: rgba(16,185,129,.16);
+    border: 1px solid rgba(16,185,129,.45);
+    color: #6ee7b7;
+    padding: .6rem .9rem;
+    border-radius: 10px;
+    font-size: .85rem;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+}
+
+.app-toast.show {
+    opacity: 1;
+    transform: translateY(0);
 }
 

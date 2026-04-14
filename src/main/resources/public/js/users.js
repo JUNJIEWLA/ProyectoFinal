@@ -45,7 +45,7 @@ function renderUsers(users) {
         li.innerHTML = `
             <span class="me-auto">
                 ${u.nombre || ''}
-                <small style="color: #94a3b8;">${u.email}</small>
+                <small class="user-email" style="color: #94a3b8;">${u.email}</small>
             </span>
             <select class="form-select form-select-sm w-auto" aria-label="Rol">
                 <option value="OPERADOR">OPERADOR</option>
@@ -60,16 +60,22 @@ function renderUsers(users) {
 
         const btnActualizar = li.querySelectorAll('button')[0];
         btnActualizar.addEventListener('click', async () => {
-            await actualizarUsuario(u.id, { rol: selectRol.value });
+            const ok = await actualizarUsuario(u.id, { rol: selectRol.value });
+            if (!ok) {
+                return;
+            }
+            showToastUsuarios('Actualizado correctamente');
             await loadUsers();
         });
 
         const btnEliminar = li.querySelectorAll('button')[1];
         btnEliminar.addEventListener('click', async () => {
-            if (!confirm(`Eliminar usuario ${u.email}?`)) {
+            const confirmed = await confirmDeleteUsuario(`Se eliminara el usuario ${u.email}. Esta accion no se puede deshacer.`);
+            if (!confirmed) {
                 return;
             }
             await eliminarUsuario(u.id);
+            showToastUsuarios('Usuario eliminado correctamente');
             await loadUsers();
         });
 
@@ -103,6 +109,7 @@ async function crearUsuario(event) {
     }
 
     document.getElementById('formUsuario').reset();
+    showToastUsuarios('Usuario creado correctamente');
     await loadUsers();
 }
 
@@ -126,7 +133,52 @@ async function actualizarUsuario(id, payload) {
     if (!resp.ok) {
         const err = await safeJson(resp);
         alert((err && err.error) || 'No se pudo actualizar el usuario');
+        return false;
     }
+
+    return true;
+}
+
+function confirmDeleteUsuario(message) {
+    const modal = document.getElementById('confirmModalUsuarios');
+    const text = document.getElementById('confirmModalUsuariosText');
+    const btnCancel = document.getElementById('confirmModalUsuariosCancel');
+    const btnOk = document.getElementById('confirmModalUsuariosOk');
+
+    return new Promise((resolve) => {
+        text.textContent = message;
+        modal.classList.add('open');
+
+        const close = (value) => {
+            modal.classList.remove('open');
+            btnCancel.removeEventListener('click', onCancel);
+            btnOk.removeEventListener('click', onOk);
+            modal.removeEventListener('click', onBackdrop);
+            resolve(value);
+        };
+
+        const onCancel = () => close(false);
+        const onOk = () => close(true);
+        const onBackdrop = (event) => {
+            if (event.target === modal) {
+                close(false);
+            }
+        };
+
+        btnCancel.addEventListener('click', onCancel);
+        btnOk.addEventListener('click', onOk);
+        modal.addEventListener('click', onBackdrop);
+    });
+}
+
+function showToastUsuarios(message) {
+    const toast = document.getElementById('toastUsuarios');
+    if (!toast) {
+        return;
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
 async function safeJson(resp) {

@@ -54,7 +54,7 @@
                         <option value="ADMIN">ADMIN</option>
                     </select>
                     <div class="btn-create-row">
-                        <button class="btn-create" type="submit" style="width:100%;">Crear usuario</button>
+                        <button class="btn-create btn-create-full" type="submit">Crear usuario</button>
                     </div>
                 </div>
             </form>
@@ -78,6 +78,19 @@
     </div>
 
 </div>
+
+<div id="confirmModalUsuarios" class="confirm-modal-backdrop" aria-hidden="true">
+    <div class="confirm-modal-box">
+        <h6 class="confirm-modal-title">Confirmar eliminacion</h6>
+        <p id="confirmModalUsuariosText" class="confirm-modal-text"></p>
+        <div class="confirm-modal-actions">
+            <button id="confirmModalUsuariosCancel" type="button" class="btn-nav">Cancelar</button>
+            <button id="confirmModalUsuariosOk" type="button" class="btn-nav danger">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastUsuarios" class="app-toast" role="status" aria-live="polite"></div>
 
 <script src="/js/auth.js"></script>
 <script src="/js/users.js"></script>

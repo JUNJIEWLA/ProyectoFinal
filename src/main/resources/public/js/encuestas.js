@@ -38,6 +38,12 @@ function bindEvents() {
         }
     });
 
+    ['nombre', 'sector', 'nivelEscolar'].forEach((id) => {
+        const input = document.getElementById(id);
+        input.addEventListener('input', () => clearFieldError(id));
+        input.addEventListener('change', () => clearFieldError(id));
+    });
+
     Auth.attachLogoutButton('btnLogout', '/login.html');
 }
 
@@ -88,7 +94,10 @@ function abrirModalEncuesta(formulario = null) {
 
     modal.classList.add('open');
     startCamera();
-    requestGeoPreview();
+    clearValidationErrors();
+    if (!formulario) {
+        requestGeoPreview();
+    }
 }
 
 function cerrarModalEncuesta() {
@@ -110,13 +119,17 @@ async function guardarFormularioLocal(event) {
     const sector = document.getElementById('sector').value.trim();
     const nivelEscolar = document.getElementById('nivelEscolar').value;
 
-    if (!nombre || !sector || !nivelEscolar) {
-        alert('Completa nombre, sector y nivel escolar.');
+    if (!validateFormulario({ nombre, sector, nivelEscolar, fotoBase64 })) {
         return;
     }
 
     try {
-        const geo = await obtenerGeoParaGuardar();
+        const geo = formularioEnEdicion
+            ? {
+                latitud: formularioEnEdicion.latitud || 0,
+                longitud: formularioEnEdicion.longitud || 0,
+            }
+            : await obtenerGeoParaGuardar();
 
         const formulario = {
             id: formularioEnEdicion ? formularioEnEdicion.id : crypto.randomUUID(),
@@ -132,10 +145,14 @@ async function guardarFormularioLocal(event) {
             updatedAt: Date.now(),
         };
 
+        const wasEditing = Boolean(formularioEnEdicion);
+
         await OfflineDB.saveFormulario(formulario);
 
         await renderPendientes();
         await loadMarkers();
+
+        showToastEncuestas(wasEditing ? 'Actualizado correctamente' : 'Guardado correctamente');
 
         cerrarModalEncuesta();
         formularioEnEdicion = null;
@@ -211,12 +228,14 @@ async function renderPendientes() {
 
             li.querySelector('.btn-editar').addEventListener('click', () => editarFormulario(p.id));
             li.querySelector('.btn-borrar').addEventListener('click', async () => {
-                if (!confirm(`Eliminar encuesta de ${p.nombre}?`)) {
+                const confirmed = await confirmDeleteEncuesta(`Se eliminara la encuesta de ${p.nombre}. Esta accion no se puede deshacer.`);
+                if (!confirmed) {
                     return;
                 }
                 await OfflineDB.deleteFormulario(p.id);
                 await renderPendientes();
                 await loadMarkers();
+                showToastEncuestas('Encuesta eliminada correctamente');
             });
 
             lista.appendChild(li);
@@ -256,13 +275,26 @@ async function loadMarkers() {
     });
     marcadores = [];
 
+    let formulariosServidor = [];
     try {
         const resp = await fetch('/api/formularios', { headers: Auth.authHeader() });
-        if (!resp.ok) {
-            return;
+        if (resp.ok) {
+            formulariosServidor = await resp.json();
         }
+    } catch {
+        // Sin conexion al servidor.
+    }
 
-        const formularios = await resp.json();
+    let formulariosPendientes = [];
+    try {
+        formulariosPendientes = await OfflineDB.getPending();
+    } catch {
+        formulariosPendientes = [];
+    }
+
+    const formularios = [...formulariosServidor, ...formulariosPendientes];
+
+    try {
         formularios.forEach((f) => {
             if (typeof f.latitud !== 'number' || typeof f.longitud !== 'number') {
                 return;
@@ -280,7 +312,7 @@ async function loadMarkers() {
             marcadores.push(marker);
         });
     } catch {
-        // Sin conexion o endpoint no disponible.
+        // Error inesperado renderizando marcadores.
     }
 }
 
@@ -328,6 +360,7 @@ async function tomarFoto() {
     try {
         fotoBase64 = window.webcam.snap();
         mostrarPreviewFoto(fotoBase64);
+        clearFieldError('foto');
     } catch (err) {
         alert(`Error al capturar foto: ${err.message}`);
     }
@@ -456,6 +489,120 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return String(text || '').replace(/[&<>"']/g, (m) => map[m]);
+}
+
+function validateFormulario(values) {
+    clearValidationErrors();
+    let valid = true;
+
+    if (!values.nombre) {
+        setFieldError('nombre', 'El nombre es obligatorio.');
+        valid = false;
+    }
+    if (!values.sector) {
+        setFieldError('sector', 'El sector es obligatorio.');
+        valid = false;
+    }
+    if (!values.nivelEscolar) {
+        setFieldError('nivelEscolar', 'El grado es obligatorio.');
+        valid = false;
+    }
+    if (!values.fotoBase64) {
+        setFieldError('foto', 'Debes capturar una foto antes de guardar.');
+        valid = false;
+    }
+
+    return valid;
+}
+
+function clearValidationErrors() {
+    ['nombre', 'sector', 'nivelEscolar', 'foto'].forEach((id) => clearFieldError(id));
+}
+
+function setFieldError(field, message) {
+    const errorEl = document.getElementById(getErrorId(field));
+    if (errorEl) {
+        errorEl.textContent = message;
+    }
+
+    if (field === 'foto') {
+        return;
+    }
+
+    const input = document.getElementById(field);
+    if (input) {
+        input.classList.add('is-invalid');
+    }
+}
+
+function clearFieldError(field) {
+    const errorEl = document.getElementById(getErrorId(field));
+    if (errorEl) {
+        errorEl.textContent = '';
+    }
+    if (field === 'foto') {
+        return;
+    }
+    const input = document.getElementById(field);
+    if (input) {
+        input.classList.remove('is-invalid');
+    }
+}
+
+function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function getErrorId(field) {
+    const map = {
+        nombre: 'errorNombre',
+        sector: 'errorSector',
+        nivelEscolar: 'errorNivel',
+        foto: 'errorFoto',
+    };
+    return map[field] || `error${capitalize(field)}`;
+}
+
+function confirmDeleteEncuesta(message) {
+    const modal = document.getElementById('confirmModalEncuesta');
+    const text = document.getElementById('confirmModalEncuestaText');
+    const btnCancel = document.getElementById('confirmModalEncuestaCancel');
+    const btnOk = document.getElementById('confirmModalEncuestaOk');
+
+    return new Promise((resolve) => {
+        text.textContent = message;
+        modal.classList.add('open');
+
+        const close = (value) => {
+            modal.classList.remove('open');
+            btnCancel.removeEventListener('click', onCancel);
+            btnOk.removeEventListener('click', onOk);
+            modal.removeEventListener('click', onBackdrop);
+            resolve(value);
+        };
+
+        const onCancel = () => close(false);
+        const onOk = () => close(true);
+        const onBackdrop = (event) => {
+            if (event.target === modal) {
+                close(false);
+            }
+        };
+
+        btnCancel.addEventListener('click', onCancel);
+        btnOk.addEventListener('click', onOk);
+        modal.addEventListener('click', onBackdrop);
+    });
+}
+
+function showToastEncuestas(message) {
+    const toast = document.getElementById('toastEncuestas');
+    if (!toast) {
+        return;
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
 initEncuestasPage();
