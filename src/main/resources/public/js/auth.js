@@ -21,7 +21,8 @@ const Auth = (() => {
 
     function isAdmin() {
         const usuario = getUsuarioActual();
-        return Boolean(usuario && usuario.rol === 'ADMIN');
+        const rol = usuario ? String(usuario.rol || '').trim().toUpperCase() : '';
+        return Boolean(rol === 'ADMIN');
     }
 
     function tryOfflineLogin(email) {
@@ -159,7 +160,8 @@ const Auth = (() => {
             target.textContent = 'No autenticado';
             return;
         }
-        target.textContent = `Autenticado: ${usuario.email} (${usuario.rol || 'SIN_ROL'})`;
+        const rol = String(usuario.rol || 'SIN_ROL').trim();
+        target.textContent = `Autenticado: ${usuario.email} (${rol})`;
     }
 
     function authHeader() {
